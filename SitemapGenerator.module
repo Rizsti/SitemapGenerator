@@ -22,14 +22,19 @@
 class SitemapGenerator extends WireData implements Module, ConfigurableModule
 {
 	const FILENAME="sitemap.xml";
+	static $defaults = array(
+		'priority' => ".5",
+		'changefreq' => "weekly"
+	);
 
 	public static function getModuleInfo() 
 	{
 		return array(
 			'title' => 'Sitemap Generator', 
-			'version' => 99, 
+			'version' => 100, 
 			'singular' => true, 
 			'autoload' => true,
+			'summary' => "Generate an SEO sitemap or multiple sitemaps with an index"
 		);
 	}
 
@@ -41,24 +46,46 @@ class SitemapGenerator extends WireData implements Module, ConfigurableModule
 
 	static public function getModuleConfigInputfields(array $data) 
 	{
+
+
 		$fields = new InputfieldWrapper();
 		$modules = Wire::getFuel('modules');
+
+		$field = $modules->get("InputfieldText");
+		$field->name = "priority";
+		$field->label = __("Default Priority");
+		$field->value = static::dataValueOrDefault('priority', $data);
+		$field->description = __("The default value of <priority></priority>");
+		$field->columnWidth = 50;
+		$fields->add($field);
+
+		$field = $modules->get("InputfieldText");
+		$field->name = "changefreq";
+		$field->label = __("Default Change Frequency");
+		$field->value = static::dataValueOrDefault('changefreq', $data);
+		$field->description = __("The default value of <changefreq></changefreq>");
+		$field->columnWidth = 50;
+		$fields->add($field);
+
 		$field = $modules->get('InputfieldMarkup');
-		$field->label  = __('Generation');
+		$field->label  = __('Index');
+
 		$field_button = $modules->get('InputfieldButton');
 		$field_button->name = 'index_site';
 		$field_button->value = __('Generate Sitemap');
 		$field_button->href = 'edit?name='.wire('input')->get('name').'&sg_update=sitemap';
-		$field_button->description = __("Doing this will overwrite your existing sitemap.xml file.");
+		$field_button->description = __("Doing this will overwrite your existing sitemap.xml file. Please be sure to submit any changes before generating your file.");
 		
 		$field->add($field_button);
 
 		$fields->add($field);
+		return $fields;
+
 	}
 
 
-	public function indexSite() {
-		if ($this->input->get('gs_update') != 'sitemap' || $event->object->template != 'admin') 
+	public function indexSite($event) {
+		if ($this->input->get('sg_update') != 'sitemap' || $event->object->template != 'admin') 
 			return;
 
 		$handle = fopen(self::FILENAME, 'w') or die('Cannot open file: ' . self::FILENAME);
@@ -84,8 +111,8 @@ class SitemapGenerator extends WireData implements Module, ConfigurableModule
 
 	public function getChildren($page) {
 		$string = "";
-		$priority = ".5";
-		$changefreq = "weekly";
+		$priority = $this->valueOrDefault('priority');
+		$changefreq = $this->valueOrDefault('changefreq');
 		if ($page->parents->count == 0) {
 			$priority = "1";
 			$changefreq = "daily";
@@ -96,6 +123,34 @@ class SitemapGenerator extends WireData implements Module, ConfigurableModule
 		}
 
 		return $string;
+	}
+
+
+	public static function dataValueOrDefault($key, $data=null)
+	{
+		if ( ! isset($data[$key]))
+			if (isset(static::$defaults[$key]))
+				return static::$defaults[$key];
+			else
+				return null;
+
+		return $data[$key];
+	}
+
+	public function valueOrDefault($key)
+	{
+		$value = null;
+
+		if (isset($this->functionCallOptions[$key]))
+			$value = $this->functionCallOptions[$key];
+
+		if (is_null($value))
+			$value = $this->get($key);
+
+		if (is_null($value) && isset(static::$defaults[$key]))
+			$value = static::$defaults[$key];
+
+		return $value;
 	}
 
 }
